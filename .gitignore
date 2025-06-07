@@ -1,0 +1,41 @@
+# Build directories
+build/
+bin/
+obj/
+
+# Compiled binaries
+*.exe
+*.out
+*.app
+*.so
+*.a
+*.o
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Test executables
+test_radix
+benchmark
+
+# Third-party cloned repos (keep only our integrated files)
+libart/ 
