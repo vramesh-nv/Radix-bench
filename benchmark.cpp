@@ -9,7 +9,9 @@
 
 extern "C" {
 #include "radix.h"
+#include "wide_radix.h"
 #include "art.h"
+#include "avl.h"
 }
 
 class Timer {
@@ -122,6 +124,40 @@ void benchmark_std_multiset(const std::vector<NvU64>& keys, const std::vector<Nv
     std::cout << "  Found:     " << found_count << "/" << search_keys.size() << " keys\n\n";
 }
 
+void benchmark_wide_radix(const std::vector<NvU64>& keys, const std::vector<NvU64>& search_keys) {
+    Timer timer;
+    wide_radix_tree_t tree;
+    wide_radix_init(&tree, 64);
+    
+    // Benchmark insertion
+    timer.start();
+    for (const auto& key : keys) {
+        wide_radix_insert(&tree, key, key);  // Use key as value
+    }
+    double insert_time = timer.stop();
+    
+    // Benchmark lookup
+    timer.start();
+    size_t found_count = 0;
+    for (const auto& key : search_keys) {
+        NvU64* found = wide_radix_lookup(&tree, key);
+        if (found) {
+            found_count++;
+        }
+    }
+    double lookup_time = timer.stop();
+    
+    double insert_time_per_op = (insert_time * 1000.0) / keys.size();  // Convert to microseconds per operation
+    double lookup_time_per_op = (lookup_time * 1000.0) / search_keys.size();  // Convert to microseconds per operation
+    
+    std::cout << "Wide Radix Tree Results:\n";
+    std::cout << "  Insertion: " << std::fixed << std::setprecision(3) << insert_time_per_op << " us/op\n";
+    std::cout << "  Lookup:    " << std::fixed << std::setprecision(3) << lookup_time_per_op << " us/op\n";
+    std::cout << "  Found:     " << found_count << "/" << search_keys.size() << " keys\n\n";
+    
+    wide_radix_destroy(&tree);
+}
+
 void benchmark_libart(const std::vector<NvU64>& keys, const std::vector<NvU64>& search_keys) {
     Timer timer;
     art_tree tree;
@@ -162,6 +198,60 @@ void benchmark_libart(const std::vector<NvU64>& keys, const std::vector<NvU64>& 
     std::cout << "  Found:     " << found_count << "/" << search_keys.size() << " keys\n\n";
     
     art_tree_destroy(&tree);
+}
+
+void benchmark_avl_tree(const std::vector<NvU64>& keys, const std::vector<NvU64>& search_keys) {
+    Timer timer;
+    CUavlTree tree;
+    
+    // Comparison function for NvU64 keys
+    auto compare_func = [](CUavlTreeKey a, CUavlTreeKey b) -> int {
+        NvU64 key_a = *(NvU64*)a;
+        NvU64 key_b = *(NvU64*)b;
+        if (key_a < key_b) return -1;
+        if (key_a > key_b) return 1;
+        return 0;
+    };
+    
+    // Print function (not used in benchmark)
+    auto print_func = [](CUavlTreeKey key) {
+        // Do nothing for benchmark
+    };
+    
+    cuAvlTreeInitialize(&tree, compare_func, print_func);
+    
+    // Benchmark insertion
+    timer.start();
+    for (const auto& key : keys) {
+        CUavlTreeNode* node = (CUavlTreeNode*)malloc(sizeof(CUavlTreeNode));
+        if (node) {
+            node->key = (void*)&key;
+            node->value = (void*)&key;  // Use key as value
+            cuAvlTreeNodeInsert(&tree, node, (void*)&key, (void*)&key);
+        }
+    }
+    double insert_time = timer.stop();
+    
+    // Benchmark lookup
+    timer.start();
+    size_t found_count = 0;
+    for (const auto& key : search_keys) {
+        CUavlTreeNode* found = cuAvlTreeNodeFind(&tree, (void*)&key);
+        if (found) {
+            found_count++;
+        }
+    }
+    double lookup_time = timer.stop();
+    
+    double insert_time_per_op = (insert_time * 1000.0) / keys.size();  // Convert to microseconds per operation
+    double lookup_time_per_op = (lookup_time * 1000.0) / search_keys.size();  // Convert to microseconds per operation
+    
+    std::cout << "AVL Tree Results:\n";
+    std::cout << "  Insertion: " << std::fixed << std::setprecision(3) << insert_time_per_op << " us/op\n";
+    std::cout << "  Lookup:    " << std::fixed << std::setprecision(3) << lookup_time_per_op << " us/op\n";
+    std::cout << "  Found:     " << found_count << "/" << search_keys.size() << " keys\n\n";
+    
+    cuAvlTreeDeinitialize(&tree);
 }
 
 void benchmark_range_queries(const std::vector<NvU64>& keys) {
@@ -252,7 +342,9 @@ int main() {
     benchmark_radix_tree(keys, search_keys);
     benchmark_std_set(keys, search_keys);
     benchmark_std_multiset(keys, search_keys);
+    benchmark_wide_radix(keys, search_keys);
     benchmark_libart(keys, search_keys);
+    benchmark_avl_tree(keys, search_keys);
     benchmark_range_queries(keys);
     
     return 0;

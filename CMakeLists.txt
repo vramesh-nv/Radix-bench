@@ -14,19 +14,33 @@ add_library(radix_tree STATIC
     radix.h
 )
 
+# Create static library for wide radix tree
+add_library(wide_radix_tree STATIC
+    wide_radix.c
+    wide_radix.h
+)
+
 # Create static library for libart (reference implementation)
 add_library(libart STATIC
     art.c
     art.h
 )
 
-# Test executable
+# Create static library for AVL tree
+add_library(avl_tree STATIC
+    avl.c
+)
+
+# Test executables
 add_executable(test_radix test_radix.c)
 target_link_libraries(test_radix radix_tree)
 
+add_executable(test_wide_radix test_wide_radix.c)
+target_link_libraries(test_wide_radix wide_radix_tree)
+
 # Benchmark executable
 add_executable(benchmark benchmark.cpp)
-target_link_libraries(benchmark radix_tree libart)
+target_link_libraries(benchmark radix_tree wide_radix_tree libart avl_tree)
 
 # Set default build type to Release for better performance
 if(NOT CMAKE_BUILD_TYPE)
