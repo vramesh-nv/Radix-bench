@@ -12,6 +12,7 @@ extern "C" {
 #include "wide_radix.h"
 #include "art.h"
 #include "avl.h"
+#include "radix_new.h"
 }
 
 class Timer {
@@ -158,6 +159,44 @@ void benchmark_wide_radix(const std::vector<NvU64>& keys, const std::vector<NvU6
     wide_radix_destroy(&tree);
 }
 
+void benchmark_radix_new(const std::vector<NvU64>& keys, const std::vector<NvU64>& search_keys) {
+    Timer timer;
+    WideRadixTree tree;
+    treeInit(&tree, 64, 8);  // 64-bit keys, 8-byte alignment
+    
+    // Benchmark insertion
+    timer.start();
+    for (const auto& key : keys) {
+        uint64_t existing;
+        int result = treeInsertOrReturnExisting(&tree, key, key, &existing);  // Use key as value
+        if (result != 0) {
+            std::cerr << "Warning: Failed to insert key " << key << " in radix_new tree\n";
+        }
+    }
+    double insert_time = timer.stop();
+    
+    // Benchmark lookup
+    timer.start();
+    size_t found_count = 0;
+    for (const auto& key : search_keys) {
+        uint64_t found = treeFind(&tree, key);
+        if (found != 0) {
+            found_count++;
+        }
+    }
+    double lookup_time = timer.stop();
+    
+    double insert_time_per_op = (insert_time * 1000.0) / keys.size();  // Convert to microseconds per operation
+    double lookup_time_per_op = (lookup_time * 1000.0) / search_keys.size();  // Convert to microseconds per operation
+    
+    std::cout << "Radix New Tree Results:\n";
+    std::cout << "  Insertion: " << std::fixed << std::setprecision(3) << insert_time_per_op << " us/op\n";
+    std::cout << "  Lookup:    " << std::fixed << std::setprecision(3) << lookup_time_per_op << " us/op\n";
+    std::cout << "  Found:     " << found_count << "/" << search_keys.size() << " keys\n\n";
+    
+    treeDestroy(&tree);
+}
+
 void benchmark_libart(const std::vector<NvU64>& keys, const std::vector<NvU64>& search_keys) {
     Timer timer;
     art_tree tree;
@@ -262,10 +301,15 @@ void benchmark_range_queries(const std::vector<NvU64>& keys) {
     std::vector<CUradixNode> nodes(keys.size());
     radixTreeInit(&radix_tree, 64);
     
+    WideRadixTree radix_new_tree;
+    treeInit(&radix_new_tree, 64, 8);
+    
     std::set<NvU64> std_set;
     
     for (size_t i = 0; i < keys.size(); ++i) {
         radixTreeInsert(&radix_tree, &nodes[i], keys[i]);
+        uint64_t existing;
+        treeInsertOrReturnExisting(&radix_new_tree, keys[i], keys[i], &existing);
         std_set.insert(keys[i]);
     }
     
@@ -284,6 +328,15 @@ void benchmark_range_queries(const std::vector<NvU64>& keys) {
     }
     double radix_range_time = timer.stop();
     
+    // New Radix tree range queries
+    timer.start();
+    size_t radix_new_found = 0;
+    for (const auto& query : query_keys) {
+        uint64_t found = treeFindGEQ(&radix_new_tree, query);
+        if (found != 0) radix_new_found++;
+    }
+    double radix_new_range_time = timer.stop();
+    
     // std::set range queries
     timer.start();
     size_t set_found = 0;
@@ -294,11 +347,16 @@ void benchmark_range_queries(const std::vector<NvU64>& keys) {
     double set_range_time = timer.stop();
     
     double radix_range_time_per_op = (radix_range_time * 1000.0) / query_keys.size();  // Convert to microseconds per operation
+    double radix_new_range_time_per_op = (radix_new_range_time * 1000.0) / query_keys.size();  // Convert to microseconds per operation
     double set_range_time_per_op = (set_range_time * 1000.0) / query_keys.size();  // Convert to microseconds per operation
     
     std::cout << "Range Query Results (lower_bound/GEQ):\n";
-    std::cout << "  Radix Tree: " << std::fixed << std::setprecision(3) << radix_range_time_per_op << " us/op (" << radix_found << " found)\n";
-    std::cout << "  std::set:   " << std::fixed << std::setprecision(3) << set_range_time_per_op << " us/op (" << set_found << " found)\n\n";
+    std::cout << "  Radix Tree:     " << std::fixed << std::setprecision(3) << radix_range_time_per_op << " us/op (" << radix_found << " found)\n";
+    std::cout << "  Radix New Tree: " << std::fixed << std::setprecision(3) << radix_new_range_time_per_op << " us/op (" << radix_new_found << " found)\n";
+    std::cout << "  std::set:       " << std::fixed << std::setprecision(3) << set_range_time_per_op << " us/op (" << set_found << " found)\n\n";
+    
+    // Cleanup
+    treeDestroy(&radix_new_tree);
 }
 
 int main() {
@@ -343,6 +401,7 @@ int main() {
     benchmark_std_set(keys, search_keys);
     benchmark_std_multiset(keys, search_keys);
     benchmark_wide_radix(keys, search_keys);
+    benchmark_radix_new(keys, search_keys);
     benchmark_libart(keys, search_keys);
     benchmark_avl_tree(keys, search_keys);
     benchmark_range_queries(keys);

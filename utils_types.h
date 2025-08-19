@@ -7,6 +7,7 @@
 // Basic type definitions
 typedef uint64_t NvU64;
 typedef uint32_t NvU32;
+typedef uint8_t NvU8;
 typedef int NvBool;
 
 // Export macro

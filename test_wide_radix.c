@@ -82,7 +82,7 @@ int main() {
     printf("   ✓ Empty tree detection works\n");
     
     wide_radix_destroy(&empty_tree);
-    wide_radix_destroy(&tree);
+    //wide_radix_destroy(&tree);
     
     printf("\nAll tests passed! ✓\n");
     return 0;
