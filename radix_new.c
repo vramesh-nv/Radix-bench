@@ -271,6 +271,7 @@ int treeInsertOrReturnExisting(WideRadixTree *tree, uint64_t key, uint64_t value
 }
 
 
+#if 1
 static inline uint64_t getFirstSetBit(uint64_t val) {
     uint64_t bit = 64;
     val &= -(int64_t)(val);
@@ -283,6 +284,11 @@ static inline uint64_t getFirstSetBit(uint64_t val) {
     if (val & 0x5555555555555555ULL) bit -= 1;
     return bit;
 }
+#else
+static inline uint64_t getFirstSetBit(uint64_t val) {
+    return val ? __builtin_ctzll(val) : 64;
+}
+#endif
 
 static inline uint64_t getFirstSetBitInRange(uint64_t *vals, uint64_t startBit, uint64_t endBit) {
     uint64_t startIdx = startBit >> 6, endIdx = endBit >> 6, retval = 0;
